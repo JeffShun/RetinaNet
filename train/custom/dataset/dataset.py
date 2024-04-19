@@ -30,6 +30,7 @@ class MyDataset(data.Dataset):
         data = np.load(file_name, allow_pickle=True)
         img = data['img']
         label = data['label']
+
         # ori_img = img.copy()
         # ori_label = label.copy()
         # transform前，数据必须转化为[C,H,W]的形状
@@ -38,20 +39,6 @@ class MyDataset(data.Dataset):
         if self._transforms:
             img, label = self._transforms(img, label)
 
-        # # For Debug
-        # import cv2
-        # x1,y1,x2,y2 = ori_label[0,:4] 
-        # img_show = cv2.cvtColor(ori_img, cv2.COLOR_GRAY2BGR)
-        # cv2.rectangle(img_show, (x1, y1), (x2, y2), (0, 0, 255), 2)
-        # cv2.imshow('Org', img_show)
-
-        # x1,y1,x2,y2 = label.numpy()[0, :4].astype("int") 
-        # img_show = cv2.cvtColor((img[0].numpy()*255).astype("uint8"), cv2.COLOR_GRAY2BGR)
-        # cv2.rectangle(img_show, (x1, y1), (x2, y2), (0, 0, 255), 2)     
-        # cv2.imshow('Processed', img_show)
-        # # 显示图像
-        # cv2.waitKey(0)
-        # cv2.destroyAllWindows()  
         return img, label
 
 

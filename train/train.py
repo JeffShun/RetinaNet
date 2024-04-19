@@ -104,7 +104,7 @@ def train():
                         save_dir = network_cfg.log_dir+"/sample/{}_{}".format(epoch+1, ii+1)
                         os.makedirs(save_dir, exist_ok=True)
                         scores, classes, pred_boxes = DetectionNet(image)
-                        save_result_as_image(image, scores, classes, pred_boxes, label, network_cfg.lable_map, save_dir)
+                        save_result_as_image(image, scores, classes, pred_boxes, label, network_cfg.label_map, save_dir)
 
                 for loss_item, loss_val in v_loss.items():
                     if loss_item not in valid_loss:

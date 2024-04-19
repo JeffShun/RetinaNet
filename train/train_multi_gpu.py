@@ -100,7 +100,7 @@ def train():
         for ii, (image, label) in enumerate(train_dataloader):
             image = V(image).cuda()
             label = V(label).cuda()
-            regressions, classifications, anchors = DetectionNet.forward_train(image)
+            regressions, classifications, anchors = DetectionNet.module.forward_train(image)
             t_loss = train_loss_f(classifications, regressions, anchors, label)
             t_losses = V(torch.zeros(1)).cuda()
             loss_info = ""
@@ -133,13 +133,13 @@ def train():
                 image = V(image).cuda()
                 label = V(label).cuda()
                 with torch.no_grad():
-                    regressions, classifications, anchors = DetectionNet.forward_train(image)
+                    regressions, classifications, anchors = DetectionNet.module.forward_train(image)
                     v_loss = valid_loss_f(classifications, regressions, anchors, label)    
                     if (ii+1) % 1 == 0: 
                         save_dir = network_cfg.log_dir+"/sample/{}_{}".format(epoch+1, ii+1)
                         os.makedirs(save_dir, exist_ok=True)
                         scores, classes, pred_boxes = DetectionNet(image)
-                        save_result_as_image(image, scores, classes, pred_boxes, label, network_cfg.lable_map, save_dir)
+                        save_result_as_image(image, scores, classes, pred_boxes, label, network_cfg.label_map, save_dir)
 
                 for loss_item, loss_val in v_loss.items():
                     if loss_item not in valid_loss:
@@ -157,7 +157,7 @@ def train():
                 logger.info('Validating Step:\t {}'.format(loss_info))
         
         if (epoch+1) % network_cfg.checkpoint_save_interval == 0:
-            torch.save(DetectionNet.module.state_dict(), network_cfg.gen_checkpoints_dir+"/{}.pth".format(epoch+1))
+            torch.save(DetectionNet.module.state_dict(), network_cfg.checkpoints_dir+"/{}.pth".format(epoch+1))
     # 删除临时缓存文件
     if rank == 0:
         if os.path.exists(init_weight):

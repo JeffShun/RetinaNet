@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torchvision.ops import nms
 
 class Decoder(nn.Module):
@@ -21,7 +20,6 @@ class Decoder(nn.Module):
         # cls_heads: [batch, nbox, classes]
         # reg_heads: [batch, nbox, 4]
         # batch_anchors: [batch, nbox, 4]
-
         device = cls_heads[0].device 
         with torch.no_grad():
             # 获取分类头和回归头的预测结果
@@ -80,6 +78,7 @@ class Decoder(nn.Module):
             
             return batch_scores, batch_classes, batch_pred_bboxes
 
+
     def snap_tx_ty_tw_th_reg_heads_to_x1_y1_x2_y2_bboxes(self, reg_heads, anchors):
         """
         将回归头的预测值转换为边界框坐标
@@ -107,5 +106,63 @@ class Decoder(nn.Module):
         pred_bboxes[:, 1] = torch.clamp(pred_bboxes[:, 1], min=0)
         pred_bboxes[:, 2] = torch.clamp(pred_bboxes[:, 2], max=self.image_w - 1)
         pred_bboxes[:, 3] = torch.clamp(pred_bboxes[:, 3], max=self.image_h - 1)
+
+        return pred_bboxes
+
+class TinyDecoder(nn.Module):
+    def __init__(self, image_w, image_h, scale_factor):
+        super(TinyDecoder, self).__init__()
+        self.image_w = image_w  # 图像的宽度
+        self.image_h = image_h  # 图像的高度
+        self.scale_factor = scale_factor  # 缩放因子
+
+    def forward(self, cls_heads, reg_heads, batch_anchors):
+        # nbox=(w//8*h//8)+(w//16*h//16)+(w//32+h//32)*n_anchor
+        # cls_heads: [batch, nbox, 1]
+        # reg_heads: [batch, nbox, 4]
+        # batch_anchors: [batch, nbox, 4]
+        device = cls_heads[0].device 
+        with torch.no_grad():
+            # 选择分数最高的框
+            batchsize = cls_heads.shape[0]
+            max_scores, max_indices = torch.max(cls_heads, dim=1)  
+            max_cls_heads = cls_heads[torch.arange(batchsize).unsqueeze(1), max_indices]           # shape: [batch, 1, 1]
+            max_reg_heads = reg_heads[torch.arange(batchsize).unsqueeze(1), max_indices]           # shape: [batch, 1, 4]
+            max_batch_anchors = batch_anchors[torch.arange(batchsize).unsqueeze(1), max_indices]   # shape: [batch, 1, 4]
+
+            # 将回归头的预测值转换为边界框坐标
+            image_pred_bboxes = self.snap_tx_ty_tw_th_reg_heads_to_x1_y1_x2_y2_bboxes(max_reg_heads, max_batch_anchors)
+            image_pred_classes = torch.zeros_like(max_cls_heads).to(device)
+            
+            return max_cls_heads, image_pred_classes, image_pred_bboxes
+        
+
+    def snap_tx_ty_tw_th_reg_heads_to_x1_y1_x2_y2_bboxes(self, reg_heads, anchors):
+        """
+        将回归头的预测值转换为边界框坐标
+        reg_heads:[batchsize,anchor_nums,4],4:[tx,ty,tw,th]
+        anchors:[batchsize,anchor_nums,4],4:[x_min,y_min,x_max,y_max]
+        """
+        anchors_wh = anchors[:, :, 2:] - anchors[:, :, :2]
+        anchors_ctr = anchors[:, :, :2] + 0.5 * anchors_wh
+
+        if self.scale_factor:
+            factor = torch.tensor([self.scale_factor]).to(anchors.device)
+            reg_heads = reg_heads * factor
+
+        pred_bboxes_wh = torch.exp(reg_heads[:, :, 2:]) * anchors_wh
+        pred_bboxes_ctr = reg_heads[:, :, :2] * anchors_wh + anchors_ctr
+
+        pred_bboxes_x_min_y_min = pred_bboxes_ctr - 0.5 * pred_bboxes_wh
+        pred_bboxes_x_max_y_max = pred_bboxes_ctr + 0.5 * pred_bboxes_wh
+
+        pred_bboxes = torch.cat([pred_bboxes_x_min_y_min, pred_bboxes_x_max_y_max], dim=2)
+        pred_bboxes = pred_bboxes.int()
+
+        # 将边界框坐标限制在图像范围内
+        pred_bboxes[:, :, 0] = torch.clamp(pred_bboxes[:, :, 0], min=0)
+        pred_bboxes[:, :, 1] = torch.clamp(pred_bboxes[:, :, 1], min=0)
+        pred_bboxes[:, :, 2] = torch.clamp(pred_bboxes[:, :, 2], max=self.image_w - 1)
+        pred_bboxes[:, :, 3] = torch.clamp(pred_bboxes[:, :, 3], max=self.image_h - 1)
 
         return pred_bboxes

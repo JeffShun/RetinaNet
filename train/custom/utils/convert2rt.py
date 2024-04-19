@@ -6,6 +6,7 @@ import torch.nn
 import os, sys
 import tensorrt as trt
 from onnxsim import simplify
+import netron
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
 work_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -13,7 +14,7 @@ sys.path.append(work_dir)
 from config.model_config import network_cfg
 
 def load_model(model_path):
-    model = network_cfg.gen_network
+    model = network_cfg.network
     checkpoint = torch.load(model_path, map_location={"cuda:0":"cuda:0","cuda:1":"cuda:0","cuda:2":"cuda:0","cuda:3":"cuda:0"})
     model.load_state_dict(checkpoint)
     model = model.cuda()
@@ -23,7 +24,7 @@ def load_model(model_path):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model_path', type=str, default='./checkpoints/Renet50/150.pth')
+    parser.add_argument('--model_path', type=str, default='./checkpoints/Resnet50/100.pth')
     parser.add_argument('--output_onnx', type=str, default='./checkpoints/onnx_model')
     parser.add_argument('--output_trt', type=str, default='./checkpoints/trt_model')
     args = parser.parse_args()
@@ -31,7 +32,6 @@ def parse_args():
 
 def torch2onnx(model_path, onnx_path):
     model = load_model(model_path)
-    model.eval()
     # 定义示例输入
     dummy_input = torch.ones((1, 1, 256, 256),requires_grad=True).cuda()
 
@@ -45,7 +45,7 @@ def torch2onnx(model_path, onnx_path):
         do_constant_folding=True,                              # whether to execute constant folding for optimization 
         input_names = ['input'],                               # the model's input names 
         output_names = ['output'],                             # the model's output names 
-        dynamic_axes = {"input":[0,2,3],"output":[0,2,3]}      # dynamic axes
+        # dynamic_axes = {"input":[0,2,3],"output":[0,2,3]}    # dynamic axes
         )
     print('Model has been converted to ONNX!') 
 
@@ -56,7 +56,7 @@ def torch2onnx(model_path, onnx_path):
     assert check, "Simplified ONNX model could not be validated"
     onnx.save(model_simp, onnx_path)
     print('Onnx model has been succesfully simplified!')
-
+    # netron.start(onnx_path)
 
 def onnx2trt(onnx_file_path, engine_file_path):
     G_LOGGER = trt.Logger(trt.Logger.WARNING)
@@ -78,7 +78,7 @@ def onnx2trt(onnx_file_path, engine_file_path):
         profile = builder.create_optimization_profile() 
         # 有几个输入就要写几个profile.set_shape 名字和转onnx的时候要对应
         # tensorrt6以后的版本是支持动态输入的，需要给每个动态输入绑定一个profile，用于指定最小值，常规值和最大值，如果超出这个范围会报异常。
-        profile.set_shape("input", (1, 1, 64, 64), (1, 1, 512, 512), (1, 1, 1024, 1024))
+        profile.set_shape("input", (1, 1, 256, 256), (1, 1, 256, 256), (1, 1, 256, 256))
         config.add_optimization_profile(profile)
         engine = builder.build_engine(network, config)
         print("Completed creating Engine")

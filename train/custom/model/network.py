@@ -12,7 +12,6 @@ class Detection_Network(nn.Module):
         apply_sync_batchnorm=False
     ):
         super(Detection_Network, self).__init__()
-
         self.backbone = backbone
         self.neck = neck
         self.head = head
@@ -41,11 +40,11 @@ class Detection_Network(nn.Module):
 
     def initialize_weights(self):
         for m in self.modules():
-            if isinstance(m, nn.Conv3d):
+            if isinstance(m, nn.Conv2d):
                 torch.nn.init.xavier_normal_(m.weight.data)
                 if m.bias is not None:
                     m.bias.data.zero_()
-            elif isinstance(m, nn.BatchNorm3d):
+            elif isinstance(m, nn.BatchNorm2d):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
             elif isinstance(m, nn.Linear):

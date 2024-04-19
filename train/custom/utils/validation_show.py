@@ -7,23 +7,25 @@ def save_result_as_image(images, scores, classes, pred_boxes, gts, lable_map, sa
     for i in range(images.shape[0]):
         img = images[i,0].cpu().numpy()
         img = (img * 255).astype("uint8")
-        draw_img = np.zeros([img.shape[0], img.shape[1], 3])
-        draw_img[:, :, 0] = img
-        draw_img[:, :, 1] = img
-        draw_img[:, :, 2] = img
+        draw_img1 = np.zeros([img.shape[0], img.shape[1], 3])
+        draw_img1[:, :, 0] = img
+        draw_img1[:, :, 1] = img
+        draw_img1[:, :, 2] = img
+
+        draw_img2 = draw_img1.copy()
         gti = gts.cpu().int().numpy()[i]
 
         probs = process_single(scores[i], classes[i], pred_boxes[i])
         for prop in probs:
             cv2.rectangle(
-                draw_img,
+                draw_img1,
                 (prop[0], prop[1]),
                 (prop[2], prop[3]),
                 color=(0, 128, 256),
                 thickness=2,
             )
             cv2.putText(
-                draw_img,
+                draw_img1,
                 "%s %.3f" % (lable_map[int(prop[4])], prop[5]),
                 (prop[0], prop[1] - 10),
                 color=(0, 128, 256),
@@ -33,20 +35,21 @@ def save_result_as_image(images, scores, classes, pred_boxes, gts, lable_map, sa
 
         for gt in gti:
             cv2.rectangle(
-                draw_img,
+                draw_img2,
                 (gt[0], gt[1]),
                 (gt[2], gt[3]),
                 color=(0, 200, 0),
                 thickness=2,
             )
             cv2.putText(
-                draw_img,
+                draw_img2,
                 "%s" % (lable_map[int(gt[4])]),
                 (gt[0], gt[1] - 10),
-                color=(0, 128, 256),
+                color=(0, 200, 0),
                 fontFace=cv2.FONT_HERSHEY_COMPLEX,
                 fontScale=0.5,
             )
+        draw_img = np.concatenate((draw_img1,draw_img2), 1)
         cv2.imwrite(save_path+"/{}.png".format(i+1), draw_img)
 
 def process_single(scores, labels, bboxes):

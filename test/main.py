@@ -24,8 +24,8 @@ def parse_args():
     parser.add_argument(
         '--model_file',
         type=str,
-        # default='../train/checkpoints/trt_model/model.engine'
-        default='../train/checkpoints/Resnet50/90.pth'
+        default='../train/checkpoints/trt_model/model.engine'
+        # default='../train/checkpoints/Resnet50/150.pth'
     )
     parser.add_argument(
         '--config_file',
@@ -42,21 +42,24 @@ def inference(predictor: Predictor, img: np.ndarray):
 
 
 def parse_label(label_map, label_path):
-    with open(label_path) as f:
-        label_data = json.load(f)
-        box_label = []
-        for shape in label_data["shapes"]: 
-            points = shape["points"]
-            x1, y1 = int(points[0][0]), int(points[0][1])
-            x2, y2 = int(points[1][0]), int(points[1][1])
+    label_map_rev = dict(zip(label_map.values(), label_map.keys()))
+    if os.path.exists(label_path):
+        with open(label_path) as f:
+            label_data = json.load(f)
+            box_label = []
+            for shape in label_data["shapes"]: 
+                if shape["label"] in label_map_rev:
+                    points = shape["points"]
+                    x1, y1 = int(points[0][0]), int(points[0][1])
+                    x2, y2 = int(points[1][0]), int(points[1][1])
+                    label = shape["label"]
+                    box_label.append((x1, y1, x2, y2, label_map_rev[label]))
+        return np.array(box_label) 
+    else:
+        return None
+    
 
-            label = shape["label"]
-            label_map_rev = dict(zip(label_map.values(), label_map.keys()))
-            box_label.append((x1, y1, x2, y2, label_map_rev[label]))
-    return np.array(box_label) 
-
-
-def save_result(img, preds, lable_map, save_path):
+def save_result(img, preds, label_map, save_path):
     img = (img-img.min())/(img.max()-img.min())
     img = (img * 255).astype("uint8")
     draw_img = np.zeros([img.shape[0], img.shape[1], 3])
@@ -73,7 +76,7 @@ def save_result(img, preds, lable_map, save_path):
         )
         cv2.putText(
             draw_img,
-            "%s %.3f" % (lable_map[int(pred[4])], pred[5]),
+            "%s %.3f" % (label_map[int(pred[4])], pred[5]),
             (int(pred[0]), int(pred[1]) - 10),
             color=(0, 128, 256),
             fontFace=cv2.FONT_HERSHEY_COMPLEX,
@@ -82,7 +85,7 @@ def save_result(img, preds, lable_map, save_path):
   
     cv2.imwrite(save_path, draw_img) 
 
-def save_result_with_gt(img, preds, gts, lable_map, save_path):
+def save_result_with_gt(img, preds, gts, label_map, save_path):
     img = (img-img.min())/(img.max()-img.min())
     img = (img * 255).astype("uint8")
     draw_img1 = np.zeros([img.shape[0], img.shape[1], 3])
@@ -101,7 +104,7 @@ def save_result_with_gt(img, preds, gts, lable_map, save_path):
         )
         cv2.putText(
             draw_img1,
-            "%s %.3f" % (lable_map[int(pred[4])], pred[5]),
+            "%s %.3f" % (label_map[int(pred[4])], pred[5]),
             (int(pred[0]), int(pred[1]) - 10),
             color=(0, 128, 256),
             fontFace=cv2.FONT_HERSHEY_COMPLEX,
@@ -118,9 +121,9 @@ def save_result_with_gt(img, preds, gts, lable_map, save_path):
         )
         cv2.putText(
             draw_img2,
-            "%s" % (lable_map[gt[4]]),
+            "%s" % (label_map[gt[4]]),
             (int(gt[0]), int(gt[1]) - 10),
-            color=(0, 128, 256),
+            color=(0, 200, 0),
             fontFace=cv2.FONT_HERSHEY_COMPLEX,
             fontScale=0.5,
         )
@@ -140,7 +143,7 @@ def main(input_path, output_path, device, args):
         model=model_detection,
     )
     os.makedirs(output_path, exist_ok=True)
-    label_map = {0:"knee"}
+    label_map = {0:"liver"}
     img_dir = os.path.join(input_path, "imgs")
     label_dir = os.path.join(input_path, "labels")
 
@@ -148,12 +151,13 @@ def main(input_path, output_path, device, args):
         img = sitk.GetArrayFromImage(sitk.ReadImage(os.path.join(img_dir, sample)))[0]
         try:
             gts = parse_label(label_map, os.path.join(label_dir, sample.replace(".dcm",".json")))
-        except:
+        except Exception as e:
+            print("Error:", e)
             gts = None
         preds = predictor_detection.predict(img)
         if gts is not None:        
             save_result_with_gt(img, preds, gts, label_map, os.path.join(output_path, f'{sample.replace(".dcm","")}.png'))
-            # save_result(img, preds, lable_map, os.path.join(output_path, f'{sample.replace(".dcm","")}.png'))
+            # save_result(img, preds, label_map, os.path.join(output_path, f'{sample.replace(".dcm","")}.png'))
             raw_result_dir = os.path.join(output_path, "raw_result")
             os.makedirs(raw_result_dir, exist_ok=True)
             # pred: [n, 6]  label:[n, 5]

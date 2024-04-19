@@ -42,33 +42,47 @@ def get_max_box_count(data_path):
 
 
 def process_single(input):
-    img_path, label_path, save_path, sample_id, label_map = input
+    img_path, label_path, save_path, sample_id, label_map_rev = input
     img_arr = np.array(Image.open(img_path))
     with open(label_path) as f:
         label_data = json.load(f)
-        box_label = []
+        box_label = []            
         for shape in label_data["shapes"]: 
-            points = shape["points"]
-            # 提取矩形框的左上角和右下角坐标
-            x1, y1 = int(points[0][0]), int(points[0][1])
-            x2, y2 = int(points[1][0]), int(points[1][1])
-            if shape["label"] not in label_map:
-                print("Undefined label {} !".format(shape["label"]))
-                continue
-            label = label_map[shape["label"]]
-            box_label.append((x1, y1, x2, y2, label))
+            if shape["label"] in label_map_rev:
+                points = shape["points"]
+                # 提取矩形框的左上角和右下角坐标
+                x1, y1 = int(points[0][0]), int(points[0][1])
+                x2, y2 = int(points[1][0]), int(points[1][1])
+                label = label_map_rev[shape["label"]]
+                box_label.append((x1, y1, x2, y2, label))            
 
-            """
-            # For Debug
-            img_show = cv2.cvtColor(img_arr, cv2.COLOR_GRAY2BGR)
-            cv2.rectangle(img_show, (x1, y1), (x2, y2), (0, 0, 255), 2)
-            # 显示图像
-            cv2.imshow('Image with Boxes', img_show)
-            cv2.waitKey(0)
-            cv2.destroyAllWindows()
-            """
-    box_label = np.array(box_label)            
-    np.savez_compressed(os.path.join(save_path, f'{sample_id}.npz'), img=img_arr, label=box_label)
+        # label_map = dict(zip(label_map_rev.values(), label_map_rev.keys()))
+        # img_show = cv2.cvtColor(img_arr, cv2.COLOR_GRAY2BGR)
+        # for label in box_label:
+        #     cv2.rectangle(
+        #         img_show,
+        #         (int(label[0]), int(label[1])),
+        #         (int(label[2]), int(label[3])),
+        #         color=(0, 200, 0),
+        #         thickness=2,
+        #     )
+        #     cv2.putText(
+        #         img_show,
+        #         "%s" % (label_map[label[4]]),
+        #         (int(label[0]), int(label[1]) - 10),
+        #         color=(0, 200, 0),
+        #         fontFace=cv2.FONT_HERSHEY_COMPLEX,
+        #         fontScale=0.5,
+        #     )
+
+        # # 显示图像
+        # cv2.imshow('Image with Boxes', img_show)
+        # cv2.waitKey(0)
+        # cv2.destroyAllWindows()
+
+    if len(box_label) > 0:
+        box_label = np.array(box_label)  
+        np.savez_compressed(os.path.join(save_path, f'{sample_id}.npz'), img=img_arr, label=box_label)
 
 
 if __name__ == '__main__':
@@ -76,7 +90,7 @@ if __name__ == '__main__':
     save_path = args.save_path
     os.makedirs(save_path, exist_ok=True)
     # 检测1个类别，最大标签为0，检测n个类别，最大标签为n-1
-    label_map_rev = {"knee":0}
+    label_map_rev = {"liver":0}
 
     for task in ["train","valid"]:
         print("\nBegin gen %s data!"%(task))
@@ -90,7 +104,7 @@ if __name__ == '__main__':
             label_path = os.path.join(label_dir, sample_id + ".json")
             inputs.append([img_path, label_path, save_path, sample_id, label_map_rev])
             all_ids.append(sample_id)
-        pool = Pool(8)
+        pool = Pool(1)
         pool.map(process_single, inputs)
         pool.close()
         pool.join()

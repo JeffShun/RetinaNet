@@ -1,2 +1,3 @@
+score_thresholds: 0.5
 input_size: [256, 256]
 
