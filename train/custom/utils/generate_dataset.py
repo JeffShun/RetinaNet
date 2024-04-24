@@ -42,7 +42,8 @@ def get_max_box_count(data_path):
 
 
 def process_single(input):
-    img_path, label_path, save_path, sample_id, label_map_rev = input
+    img_path, label_path, save_path, sample_id, label_map = input
+    label_map_rev = dict(zip(label_map.values(), label_map.keys()))
     img_arr = np.array(Image.open(img_path))
     with open(label_path) as f:
         label_data = json.load(f)
@@ -90,7 +91,7 @@ if __name__ == '__main__':
     save_path = args.save_path
     os.makedirs(save_path, exist_ok=True)
     # 检测1个类别，最大标签为0，检测n个类别，最大标签为n-1
-    label_map_rev = {"liver":0}
+    label_map = {0: "liver"}
 
     for task in ["train","valid"]:
         print("\nBegin gen %s data!"%(task))
@@ -102,7 +103,7 @@ if __name__ == '__main__':
             img_path = os.path.join(img_dir, sample)
             sample_id = sample.replace('.png', '')
             label_path = os.path.join(label_dir, sample_id + ".json")
-            inputs.append([img_path, label_path, save_path, sample_id, label_map_rev])
+            inputs.append([img_path, label_path, save_path, sample_id, label_map])
             all_ids.append(sample_id)
         pool = Pool(1)
         pool.map(process_single, inputs)

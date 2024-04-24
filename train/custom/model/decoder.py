@@ -126,18 +126,19 @@ class TinyDecoder(nn.Module):
             # 选择分数最高的框
             batchsize = cls_heads.shape[0]
             max_scores, max_indices = torch.max(cls_heads, dim=1)  
+            max_indices = max_indices.long()
             max_cls_heads = cls_heads[torch.arange(batchsize).unsqueeze(1), max_indices]           # shape: [batch, 1, 1]
             max_reg_heads = reg_heads[torch.arange(batchsize).unsqueeze(1), max_indices]           # shape: [batch, 1, 4]
             max_batch_anchors = batch_anchors[torch.arange(batchsize).unsqueeze(1), max_indices]   # shape: [batch, 1, 4]
 
             # 将回归头的预测值转换为边界框坐标
-            image_pred_bboxes = self.snap_tx_ty_tw_th_reg_heads_to_x1_y1_x2_y2_bboxes(max_reg_heads, max_batch_anchors)
+            image_pred_bboxes = self.bsnap_tx_ty_tw_th_reg_heads_to_x1_y1_x2_y2_bboxes(max_reg_heads, max_batch_anchors)
             image_pred_classes = torch.zeros_like(max_cls_heads).to(device)
             
             return max_cls_heads, image_pred_classes, image_pred_bboxes
         
 
-    def snap_tx_ty_tw_th_reg_heads_to_x1_y1_x2_y2_bboxes(self, reg_heads, anchors):
+    def bsnap_tx_ty_tw_th_reg_heads_to_x1_y1_x2_y2_bboxes(self, reg_heads, anchors):
         """
         将回归头的预测值转换为边界框坐标
         reg_heads:[batchsize,anchor_nums,4],4:[tx,ty,tw,th]
