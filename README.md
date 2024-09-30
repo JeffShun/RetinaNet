@@ -1,4 +1,3 @@
-# Object_Detection
 ## 一、模型介绍
 基于RetinaNet的目标检测框架，backbone和损失函数等自定义
 
